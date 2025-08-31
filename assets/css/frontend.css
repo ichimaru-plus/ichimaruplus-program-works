@@ -1,0 +1,16 @@
+:root{
+  --icpw-accent:#6366f1;
+  --icpw-accent-contrast:#fff;
+  --icpw-border:#e5e7eb;
+}
+.icpw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin:16px 0}
+.icpw-card{border:1px solid var(--icpw-border);border-radius:12px;padding:14px;background:#fff}
+.icpw-title{font-weight:700;margin:0 0 6px;font-size:1.05rem}
+.icpw-meta{font-size:.88rem;color:#374151;margin:.5em 0}
+.icpw-badges{display:flex;flex-wrap:wrap;gap:6px;margin:.5em 0}
+.icpw-badge{background:var(--icpw-accent);color:var(--icpw-accent-contrast);padding:2px 8px;border-radius:999px;font-size:.78rem}
+.icpw-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.icpw-btn{border:1px solid var(--icpw-border);border-radius:8px;padding:6px 10px;font-size:.85rem;background:#fafafa;cursor:pointer}
+.icpw-btn.copy{background:var(--icpw-accent);color:var(--icpw-accent-contrast);border-color:var(--icpw-accent)}
+.icpw-desc{color:#4b5563;font-size:.9rem;margin:.5em 0}
+.icpw-small{font-size:.8rem;color:#6b7280}
