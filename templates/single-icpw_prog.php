@@ -1,62 +1,117 @@
 <?php
 /**
- * プラグイン内テンプレート: single-icpw_prog.php
- * - テーマに依存せず、プラグイン内で個別ページを描画
- * - 本文（the_content）の後に、[icpw_works] ショートコードでカードUIを1枚表示
+ * Single template for icpw_prog
  */
-if (!defined('ABSPATH')) { exit; }
-
-// ヘッダー
+if (!defined('ABSPATH')) exit;
 get_header();
 
-// スタイル/JS（プラグインで登録済みのハンドルを利用）
-wp_enqueue_style('ichimaruplus-program-works');
-wp_enqueue_script('ichimaruplus-program-works');
+while (have_posts()): the_post();
+  $meta = [
+    'repo_url'   => get_post_meta(get_the_ID(), 'icpw_repo_url', true),
+    'branch'     => get_post_meta(get_the_ID(), 'icpw_repo_branch', true),
+    'display_ver'=> get_post_meta(get_the_ID(), 'icpw_display_version', true),
+    'license'    => get_post_meta(get_the_ID(), 'icpw_license', true),
+    'site_url'   => get_post_meta(get_the_ID(), 'icpw_site_url', true),
+    'docs_url'   => get_post_meta(get_the_ID(), 'icpw_docs_url', true),
+  ];
 
-// アクセントカラー（設定ページの値を反映）
-if (class_exists('ICPW_PW_Admin')) {
-  $opt = ICPW_PW_Admin::get_settings();
-  $accent = $opt['accent_color'] ?? '#6366f1';
-  wp_add_inline_style('ichimaruplus-program-works', ':root{--icpw-accent:' . esc_attr($accent) . '}');
-}
+  // GitHubメタ（スター/フォーク/イシュー/言語）は class-github 側で保存している想定
+  $gh = [
+    'stars'  => (int) get_post_meta(get_the_ID(), 'icpw_gh_stars', true),
+    'forks'  => (int) get_post_meta(get_the_ID(), 'icpw_gh_forks', true),
+    'issues' => (int) get_post_meta(get_the_ID(), 'icpw_gh_issues', true),
+    'lang'   => (string) get_post_meta(get_the_ID(), 'icpw_gh_language', true),
+  ];
 ?>
-<main id="primary" class="site-main" style="margin: 2rem auto; max-width: 1000px; padding: 0 1rem;">
-  <?php if (have_posts()): while (have_posts()): the_post(); ?>
-    <article id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
-      <header class="entry-header">
-        <h1 class="entry-title"><?php echo esc_html(get_the_title()); ?></h1>
+  <main id="primary" class="site-main">
+    <article <?php post_class('icpw-card'); ?>>
+
+      <header class="icpw-head">
+        <h1 class="icpw-title"><?php the_title(); ?></h1>
+        <div class="icpw-ghmeta" aria-label="リポジトリ統計">
+          <?php if ($gh['stars']): ?>
+            <span class="icpw-ico" title="Star">
+              <!-- star -->
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27l6.18 3.73-1.64-7.03L21.5 9.24l-7.12-.61L12 2 9.62 8.63l-7.12.61 4.96 4.73L6.82 21z"/></svg>
+              <span><?php echo number_format_i18n($gh['stars']); ?></span>
+            </span>
+          <?php endif; ?>
+          <?php if ($gh['forks']): ?>
+            <span class="icpw-ico" title="Fork">
+              <!-- fork -->
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 3a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4zM7 17a2 2 0 100 4 2 2 0 000-4zm10-8a3 3 0 01-3 3H10a3 3 0 01-3-3V9h2v1a1 1 0 001 1h4a1 1 0 001-1V9h2v0zM8 14h2v2H8v-2zm6 0h2v2h-2v-2z"/></svg>
+              <span><?php echo number_format_i18n($gh['forks']); ?></span>
+            </span>
+          <?php endif; ?>
+          <?php if ($gh['issues']): ?>
+            <span class="icpw-ico" title="Issues">
+              <!-- issue -->
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 7h2v6h-2V7zm0 8h2v2h-2v-2zm1-13C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
+              <span><?php echo number_format_i18n($gh['issues']); ?></span>
+            </span>
+          <?php endif; ?>
+          <?php if ($gh['lang']): ?>
+            <span class="icpw-ico" title="主言語">
+              <!-- code -->
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.4 16.6L5.8 13l3.6-3.6L8 8l-5 5 5 5 1.4-1.4zm5.2 0L18.2 13l-3.6-3.6L16 8l5 5-5 5-1.4-1.4z"/></svg>
+              <span><?php echo esc_html($gh['lang']); ?></span>
+            </span>
+          <?php endif; ?>
+        </div>
       </header>
 
-      <div class="entry-content">
-        <?php
-          // 通常の本文
-          the_content();
-
-          // この投稿（1件）のカードUIを追加表示（GitHub情報/Download/コピー対応）
-          echo do_shortcode('[icpw_works ids="' . get_the_ID() . '" per_page="1" github="1"]');
-        ?>
+      <div class="icpw-description">
+        <?php the_content(); ?>
       </div>
 
-      <footer class="entry-footer">
-        <?php
-          // 任意: タグ・カテゴリなど必要なら出力（デフォルトは未使用）
-          // the_terms(get_the_ID(), 'post_tag');
-        ?>
-      </footer>
+      <dl class="icpw-info">
+        <?php if ($meta['display_ver']): ?>
+          <dt>表示バージョン</dt><dd><?php echo esc_html($meta['display_ver']); ?></dd>
+        <?php endif; ?>
+        <?php if ($meta['license']): ?>
+          <dt>ライセンス</dt><dd><?php echo esc_html($meta['license']); ?></dd>
+        <?php endif; ?>
+        <?php if ($meta['branch']): ?>
+          <dt>デフォルトブランチ</dt><dd><?php echo esc_html($meta['branch']); ?></dd>
+        <?php endif; ?>
+        <?php if ($meta['repo_url']): ?>
+          <dt>Gitリポジトリ</dt><dd><a href="<?php echo esc_url($meta['repo_url']); ?>" target="_blank" rel="noopener"><?php echo esc_html($meta['repo_url']); ?></a></dd>
+        <?php endif; ?>
+        <?php if ($meta['site_url']): ?>
+          <dt>製品サイト</dt><dd><a href="<?php echo esc_url($meta['site_url']); ?>" target="_blank" rel="noopener"><?php echo esc_html($meta['site_url']); ?></a></dd>
+        <?php endif; ?>
+        <?php if ($meta['docs_url']): ?>
+          <dt>ドキュメント</dt><dd><a href="<?php echo esc_url($meta['docs_url']); ?>" target="_blank" rel="noopener"><?php echo esc_html($meta['docs_url']); ?></a></dd>
+        <?php endif; ?>
+      </dl>
+
+      <div class="icpw-buttons">
+        <?php if ($meta['repo_url']): ?>
+          <a class="icpw-btn" href="<?php echo esc_url($meta['repo_url']); ?>" target="_blank" rel="noopener">
+            GitHubで見る
+          </a>
+        <?php endif; ?>
+        <?php if ($meta['docs_url']): ?>
+          <a class="icpw-btn icpw-btn--ghost" href="<?php echo esc_url($meta['docs_url']); ?>" target="_blank" rel="noopener">
+            ドキュメント
+          </a>
+        <?php endif; ?>
+      </div>
+
+      <?php
+      // 例：ダウンロード用コマンド表示（コピーしやすい）
+      if ($meta['repo_url']) :
+        $cmd = 'git clone ' . $meta['repo_url'];
+      ?>
+        <div class="icpw-code">
+          <button class="icpw-copy-btn" data-icpw-copy="<?php echo esc_attr($cmd); ?>">コピー</button>
+          <code><?php echo esc_html($cmd); ?></code>
+        </div>
+      <?php endif; ?>
+
     </article>
-
-    <?php
-      // 任意: コメントを使う場合
-      if (comments_open() || get_comments_number()) {
-        comments_template();
-      }
-    ?>
-
-  <?php endwhile; else: ?>
-    <p>該当する投稿が見つかりませんでした。</p>
-  <?php endif; ?>
-</main>
+  </main>
 
 <?php
-// フッター
+endwhile;
 get_footer();

@@ -2,8 +2,9 @@
 Contributors: ichimaruplus
 Tags: program, works, showcase, github, csv, rest-api, auto-update
 Requires at least: 6.0
-Tested up to: 6.6
-Stable tag: 1.1.3
+Tested up to: 6.8.2
+Requires PHP: 7.4
+Stable tag: 1.1.4
 License: GPL-2.0+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +48,11 @@ A. 設定画面からカードの角丸や影の濃さを調整可能です。
 
 == Changelog ==
 
+= 1.1.4 =
+* カードUIを日本語・モノクロアイコンで刷新
+* タイトルを省略せず全文表示
+* ボタン文言を日本語化、コピーUIを改善
+
 = 1.1.3 =
 * カードの横幅を 100% に変更（レスポンシブ対応を改善）
 
@@ -65,5 +71,5 @@ A. 設定画面からカードの角丸や影の濃さを調整可能です。
 
 == Upgrade Notice ==
 
-= 1.1.2 =
-安定化と不具合修正が含まれます。必ずアップデートしてください。
+= 1.1.4 =
+カードデザインを大幅に刷新しました。更新を推奨します。

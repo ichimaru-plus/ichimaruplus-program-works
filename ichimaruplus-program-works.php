@@ -3,7 +3,7 @@
  * Plugin Name: Ichimaru+ Program Works
  * Plugin URI:  https://github.com/ichimaru-plus/ichimaruplus-program-works
  * Description: プログラム作品（プラグイン/アプリ/ツール）を登録・公開。GitHub連携、CSV入出力、REST API、自動更新、ショートコード、色設定、コピー用ボタン対応。
- * Version:     1.1.3
+ * Version:     1.1.4
  * Author:      Ichimaru+
  * Author URI:  https://ichimaru.plus
  * Update URI:  ichimaruplus-program-works
