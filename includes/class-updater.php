@@ -2,13 +2,19 @@
 /**
  * Safe GitHub Updater (standalone)
  *
- * - 公式ディレクトリ未登録のプラグインを GitHub Releases から更新
- * - Assets の ZIP を最優先（フォルダ名が壊れない）
- * - zipball は最後のフォールバック
- * - 「プラグインの詳細」モーダルにも Release 情報を表示
+ * 公式ディレクトリ未登録のプラグインを、GitHub Releases から安全に自動更新するためのクラス。
+ * - Release Assets の ZIP を最優先（フォルダ名が壊れない）
+ * - zipball（Source code.zip）は最後のフォールバック
+ * - zipball でも展開直後にフォルダ名を正規化（owner-repo-<hash>/... を補正）
+ * - 「プラグインの詳細を表示」モーダルにも Release 情報を表示
  *
- * 使い方：
- * new ICPW_Updater(__FILE__, 'ichimaru-plus/ichimaruplus-program-works');
+ * 使い方（プラグイン本体で呼び出し）:
+ *   require_once plugin_dir_path(__FILE__) . 'includes/class-updater.php';
+ *   add_action('plugins_loaded', function(){
+ *     if (is_admin()) {
+ *       new ICPW_Updater(__FILE__, 'ichimaru-plus/ichimaruplus-program-works'); // owner/repo に置換
+ *     }
+ *   });
  */
 
 if (!defined('ABSPATH')) { exit; }
@@ -17,7 +23,7 @@ if (!class_exists('ICPW_Updater')):
 
 class ICPW_Updater {
 
-	/** @var string プラグインメインファイル */
+	/** @var string プラグインのメインファイル（__FILE__ を渡す） */
 	private $plugin_file;
 
 	/** @var string プラグインのベース名 (dir/file.php) */
@@ -26,34 +32,41 @@ class ICPW_Updater {
 	/** @var string GitHub "owner/repo" */
 	private $repo;
 
-	/** @var string API ベース */
+	/** @var string GitHub API ベースURL */
 	private $api_base = 'https://api.github.com';
 
-	/** @var string GitHub API UA */
+	/** @var string GitHub API User-Agent（必須） */
 	private $user_agent = 'WordPress; IchimaruPlus-Updater';
 
-	/** @var string キャッシュ用 key */
+	/** @var string サイトトランジェントキー（最新Releaseキャッシュ） */
 	private $cache_key;
 
-	/** @var int キャッシュ（秒） */
+	/** @var int キャッシュTTL（秒） */
 	private $cache_ttl = 15 * MINUTE_IN_SECONDS;
 
 	public function __construct($plugin_file, $repo) {
-		$this->plugin_file    = $plugin_file;
-		$this->plugin_basename= plugin_basename($plugin_file);
-		$this->repo           = trim($repo);
-		$this->cache_key      = 'icpw_updater_' . md5($this->repo);
+		$this->plugin_file     = $plugin_file;
+		$this->plugin_basename = plugin_basename($plugin_file);
+		$this->repo            = trim($repo);
+		$this->cache_key       = 'icpw_updater_' . md5($this->repo);
 
+		// 更新チェックに差し込み
 		add_filter('pre_set_site_transient_update_plugins', [$this, 'inject_update']);
-		add_filter('plugins_api',                             [$this, 'plugins_api'], 20, 3);
-		add_filter('upgrader_source_selection',               [$this, 'normalize_folder_name'], 10, 4);
+
+		// プラグイン詳細モーダル
+		add_filter('plugins_api', [$this, 'plugins_api'], 20, 3);
+
+		// zipball など展開時にフォルダ名を正規化
+		add_filter('upgrader_source_selection', [$this, 'normalize_folder_name'], 10, 4);
 	}
 
-	/* -----------------------------------------------------------
-	 * Update injection
-	 * -------------------------------------------------------- */
+	/* =========================================================
+	 * 更新情報を WP に注入
+	 * ======================================================= */
 	public function inject_update($transient) {
-		if (empty($transient->checked)) return $transient;
+		if (empty($transient) || !is_object($transient) || empty($transient->checked)) {
+			return $transient;
+		}
 
 		$current_version = $this->get_current_version();
 		$rel = $this->get_latest_release();
@@ -61,7 +74,7 @@ class ICPW_Updater {
 
 		$latest = ltrim((string)($rel->tag_name ?? ''), 'v');
 		if (!$latest || version_compare($latest, $current_version, '<=')) {
-			return $transient;
+			return $transient; // 最新、または取得不可
 		}
 
 		$download = $this->resolve_download_url($rel);
@@ -72,7 +85,7 @@ class ICPW_Updater {
 			'plugin'      => $this->plugin_basename,
 			'new_version' => $latest,
 			'package'     => $download,
-			'url'         => $rel->html_url ?? 'https://github.com/'.$this->repo,
+			'url'         => $rel->html_url ?? ('https://github.com/' . $this->repo),
 			'icons'       => [],
 			'banners'     => [],
 			'tested'      => null,
@@ -82,9 +95,9 @@ class ICPW_Updater {
 		return $transient;
 	}
 
-	/* -----------------------------------------------------------
-	 * Plugin details modal（「詳細を表示」）
-	 * -------------------------------------------------------- */
+	/* =========================================================
+	 * 「プラグインの詳細を表示」モーダル
+	 * ======================================================= */
 	public function plugins_api($result, $action, $args) {
 		if ($action !== 'plugin_information') return $result;
 
@@ -96,18 +109,17 @@ class ICPW_Updater {
 
 		$ver  = ltrim((string)($rel->tag_name ?? ''), 'v');
 		$dl   = $this->resolve_download_url($rel);
-		$ch   = $this->format_changelog($rel);
 
 		$info = (object)[
 			'name'          => $this->human_name(),
 			'slug'          => $slug,
 			'version'       => $ver ?: $this->get_current_version(),
 			'author'        => '<a href="https://ichimaru.plus" target="_blank" rel="noopener">Ichimaru+</a>',
-			'homepage'      => $rel->html_url ?? 'https://github.com/'.$this->repo,
+			'homepage'      => $rel->html_url ?? ('https://github.com/' . $this->repo),
 			'download_link' => $dl,
 			'sections'      => [
 				'description'  => wp_kses_post($this->release_body_to_html($rel)),
-				'changelog'    => $ch,
+				'changelog'    => $this->format_changelog($rel),
 			],
 			'last_updated'  => !empty($rel->published_at) ? gmdate('Y-m-d H:i:s', strtotime($rel->published_at)) : null,
 			'icons'         => [],
@@ -124,38 +136,50 @@ class ICPW_Updater {
 		return $info;
 	}
 
-	/* -----------------------------------------------------------
-	 * Normalize folder name on install from zipball
-	 * -------------------------------------------------------- */
+	/* =========================================================
+	 * zip 展開直後にフォルダ名を正規化（zipball対策）
+	 * - owner-repo-<hash>/ichimaruplus-program-works/ を持ち上げる
+	 * - 既存の目的フォルダがあれば安全に置換
+	 * ======================================================= */
 	public function normalize_folder_name($source, $remote_source, $upgrader, $hook_extra) {
-		// 自プラグイン更新時のみ介入
+		// 自プラグインの更新時のみ介入
 		if (empty($hook_extra['plugin'])) return $source;
 
 		$targets = is_array($hook_extra['plugin']) ? $hook_extra['plugin'] : [$hook_extra['plugin']];
 		$match   = false;
 		foreach ($targets as $p) {
-			if (strpos($p, $this->plugin_basename) !== false) {
-				$match = true; break;
-			}
+			if (strpos($p, $this->plugin_basename) !== false) { $match = true; break; }
 		}
 		if (!$match) return $source;
 
-		$desired_folder = dirname($this->plugin_basename); // ichimaruplus-program-works
-		$basename       = basename($source);
-		if ($basename === $desired_folder) return $source;
+		$desired  = dirname($this->plugin_basename);      // 'ichimaruplus-program-works'
+		$basename = basename($source);
+		$dest     = trailingslashit($remote_source) . $desired;
 
-		$dest = trailingslashit($remote_source) . $desired_folder;
-		// 既に存在する場合は一旦削除/リネーム（安全側）
-		if (is_dir($dest)) {
-			$this->rrmdir($dest);
+		// パターン1: zipball のトップ (owner-repo-hash/) 直下に目的フォルダがある
+		$inner = trailingslashit($source) . $desired;
+		if (is_dir($inner)) {
+			if (is_dir($dest)) { $this->rrmdir($dest); }
+			@rename($inner, $dest);
+			// 外側の owner-repo-hash フォルダを掃除
+			$this->rrmdir($source);
+			return is_dir($dest) ? $dest : $source;
 		}
-		@rename($source, $dest);
-		return is_dir($dest) ? $dest : $source;
+
+		// パターン2: トップ階層のフォルダ名が目的名と異なる（そのままリネーム）
+		if ($basename !== $desired) {
+			if (is_dir($dest)) { $this->rrmdir($dest); }
+			@rename($source, $dest);
+			return is_dir($dest) ? $dest : $source;
+		}
+
+		// 既に目的名
+		return $source;
 	}
 
-	/* -----------------------------------------------------------
+	/* =========================================================
 	 * Helpers
-	 * -------------------------------------------------------- */
+	 * ======================================================= */
 	private function get_current_version() {
 		if (!function_exists('get_plugin_data')) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
@@ -172,7 +196,7 @@ class ICPW_Updater {
 		return isset($data['Name']) ? $data['Name'] : $this->plugin_basename;
 	}
 
-	/** GitHub latest release を取得（結果は短時間キャッシュ） */
+	/** 最新 Release を GitHub API から取得（短期キャッシュ） */
 	private function get_latest_release() {
 		$cached = get_site_transient($this->cache_key);
 		if ($cached) return $cached;
@@ -182,7 +206,6 @@ class ICPW_Updater {
 			'timeout' => 12,
 			'headers' => ['User-Agent' => $this->user_agent],
 		]);
-
 		if (is_wp_error($resp)) return null;
 
 		$data = json_decode(wp_remote_retrieve_body($resp));
@@ -192,9 +215,9 @@ class ICPW_Updater {
 		return $data;
 	}
 
-	/** Assets から ZIP のダウンロード URL を優先的に解決 */
+	/** ダウンロードURLを解決：Assets の .zip を最優先、なければ zipball_url */
 	private function resolve_download_url($release) {
-		// 1) Assets の .zip を最優先（フォルダ名が壊れない）
+		// 1) Assets の .zip を最優先（フォルダ名が壊れず安定）
 		if (!empty($release->assets) && is_array($release->assets)) {
 			foreach ($release->assets as $asset) {
 				$name = (string)($asset->name ?? '');
@@ -203,20 +226,19 @@ class ICPW_Updater {
 				}
 			}
 		}
-		// 2) なければ zipball_url（コミットハッシュつきフォルダ名に注意）
+		// 2) フォールバック：zipball（owner-repo-hash フォルダになる点に注意）
 		if (!empty($release->zipball_url)) {
 			return (string)$release->zipball_url;
 		}
 		return '';
 	}
 
-	/** Release body → HTML（簡易整形） */
+	/** Release body を簡易HTML整形（箇条書き→<ul><li>） */
 	private function release_body_to_html($release) {
 		$body = (string)($release->body ?? '');
 		if ($body === '') {
 			return esc_html__('No description provided.', 'ichimaruplus-pw');
 		}
-		// 箇条書きマークダウンを簡易的に <ul><li> 化
 		$lines = preg_split('/\R/', $body);
 		$out   = [];
 		foreach ($lines as $ln) {
@@ -226,17 +248,16 @@ class ICPW_Updater {
 				$out[] = '<p>' . esc_html($ln) . '</p>';
 			}
 		}
-		// <li> が一つでもあれば <ul> で囲む
 		$html = implode("\n", $out);
 		if (strpos($html, '<li>') !== false) {
-			$html = preg_replace('/(?:\s*<p>\s*<\/p>\s*)+/', '', $html); // 空 <p> を軽く除去
+			$html = preg_replace('/(?:\s*<p>\s*<\/p>\s*)+/', '', $html);
 			$html = '<ul>' . preg_replace('/<\/p>\s*<li>/', '<li>', $html) . '</ul>';
 			$html = str_replace(['<p><li>', '</li></p>'], ['<li>', '</li>'], $html);
 		}
 		return $html;
 	}
 
-	/** Changelog セクション用（Release 情報から） */
+	/** Changelog セクション（Release 情報から生成） */
 	private function format_changelog($release) {
 		$ver  = esc_html(ltrim((string)($release->tag_name ?? ''), 'v'));
 		$date = !empty($release->published_at) ? gmdate('Y-m-d', strtotime($release->published_at)) : '';
@@ -244,7 +265,7 @@ class ICPW_Updater {
 		return $hdr . $this->release_body_to_html($release);
 	}
 
-	/** 再帰削除（フォルダ正規化時の安全措置） */
+	/** 再帰削除（フォルダ名正規化時の安全措置） */
 	private function rrmdir($dir) {
 		if (!is_dir($dir)) return;
 		$items = scandir($dir);
