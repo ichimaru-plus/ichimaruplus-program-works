@@ -73,9 +73,9 @@ class ICPW_Updater {
 			'new_version' => $latest,
 			'package'     => $download,
 			'url'         => $rel->html_url ?? 'https://github.com/'.$this->repo,
-			'icons'       => [], // あれば設定
+			'icons'       => [],
 			'banners'     => [],
-			'tested'      => null, // readme.txt があれば後述 API に出る
+			'tested'      => null,
 			'requires'    => null,
 		];
 
@@ -83,7 +83,7 @@ class ICPW_Updater {
 	}
 
 	/* -----------------------------------------------------------
-	 * Plugin details modal (「詳細を表示」)
+	 * Plugin details modal（「詳細を表示」）
 	 * -------------------------------------------------------- */
 	public function plugins_api($result, $action, $args) {
 		if ($action !== 'plugin_information') return $result;
@@ -249,7 +249,7 @@ class ICPW_Updater {
 		if (!is_dir($dir)) return;
 		$items = scandir($dir);
 		foreach ($items as $item) {
-			if ($item === '.' || $item === '.') continue;
+			if ($item === '.' || $item === '..') continue;
 			$path = $dir . DIRECTORY_SEPARATOR . $item;
 			if (is_dir($path)) $this->rrmdir($path);
 			else @unlink($path);
