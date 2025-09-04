@@ -3,7 +3,7 @@
  * Plugin Name: Ichimaru+ Program Works
  * Plugin URI:  https://github.com/ichimaru-plus/ichimaruplus-program-works
  * Description: プログラム作品（プラグイン/アプリ/ツール）を登録・公開。GitHub連携、CSV入出力、REST API、自動更新、ショートコード、色設定、コピー用ボタン対応。
- * Version:     1.1.2
+ * Version:     1.1.3
  * Author:      Ichimaru+
  * Author URI:  https://ichimaru.plus
  * Update URI:  ichimaruplus-program-works
@@ -14,11 +14,25 @@
 if (!defined('ABSPATH')) { exit; }
 
 /** ============================================================================
- * 定数
+ * 定数・ヘルパー
  * ========================================================================== */
-define('ICPW_PW_VER',  '1.1.2');                                  // ← ヘッダー Version と一致
 define('ICPW_PW_PATH', plugin_dir_path(__FILE__));
 define('ICPW_PW_URL',  plugin_dir_url(__FILE__));
+
+/**
+ * プラグインバージョンをヘッダーから取得
+ * → 「Version:」を唯一の真実にして、他ファイルでの手動更新を不要にする
+ */
+function icpw_pw_version() {
+	static $v = null;
+	if ($v !== null) return $v;
+	if (!function_exists('get_plugin_data')) {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	}
+	$data = get_plugin_data(__FILE__, false, false);
+	$v = isset($data['Version']) ? $data['Version'] : '0.0.0';
+	return $v;
+}
 
 /** ============================================================================
  * 読み込み
@@ -30,7 +44,7 @@ require_once ICPW_PW_PATH . 'includes/class-api.php';
 require_once ICPW_PW_PATH . 'includes/class-import-export.php';
 require_once ICPW_PW_PATH . 'includes/class-admin.php';
 require_once ICPW_PW_PATH . 'includes/class-frontend.php';
-require_once ICPW_PW_PATH . 'includes/class-updater.php'; // 安全版アップデータ
+require_once ICPW_PW_PATH . 'includes/class-updater.php';
 
 /** ============================================================================
  * 初期化
@@ -57,8 +71,19 @@ add_action('admin_init', ['ICPW_PW_Admin', 'register_settings']);     // 設定�
 
 /** アセット（フロント） */
 add_action('wp_enqueue_scripts', function () {
-	wp_register_style('ichimaruplus-program-works', ICPW_PW_URL . 'assets/css/frontend.css', [], ICPW_PW_VER);
-	wp_register_script('ichimaruplus-program-works', ICPW_PW_URL . 'assets/js/frontend.js', [], ICPW_PW_VER, true);
+	wp_register_style(
+		'ichimaruplus-program-works',
+		ICPW_PW_URL . 'assets/css/frontend.css',
+		[],
+		icpw_pw_version()
+	);
+	wp_register_script(
+		'ichimaruplus-program-works',
+		ICPW_PW_URL . 'assets/js/frontend.js',
+		[],
+		icpw_pw_version(),
+		true
+	);
 });
 
 /** 有効化/無効化時のパーマリンク再生成 */
@@ -83,11 +108,9 @@ add_filter('template_include', function ($template) {
 
 /** ============================================================================
  * GitHub Releases による自動更新（管理画面のみ）
- * 競合を避けるため、インラインのアップデータは使わず class-updater.php に一本化
  * ========================================================================== */
 add_action('plugins_loaded', function () {
 	if (is_admin()) {
-		// 例: 'ichimaru-plus/ichimaruplus-program-works'
 		new ICPW_Updater(__FILE__, 'ichimaru-plus/ichimaruplus-program-works');
 	}
 });

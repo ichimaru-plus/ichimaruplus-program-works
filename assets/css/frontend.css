@@ -1,75 +1,85 @@
-:root{
-  --icpw-accent:#6366f1;
-  --icpw-accent-contrast:#fff;
-  --icpw-border:#e5e7eb;
-  --icpw-radius:6px;
-  --icpw-shadow:0 2px 6px rgba(0,0,0,0.08);
+/* Ichimaru+ Program Works - フロント用CSS */
+
+/* カード全体 */
+.icpw-card {
+  width: 100% !important;   /* 横幅100% */
+  max-width: 100% !important;
+  box-sizing: border-box;
+  border-radius: var(--icpw-radius, 8px);
+  box-shadow: var(--icpw-shadow, 0 2px 6px rgba(0,0,0,0.1));
+  background: #fff;
+  margin: 1rem auto;
+  padding: 1.2rem;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.icpw-grid{
-  display:grid;
-  gap:16px;
+.icpw-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
 }
 
-.icpw-card{
-  border:1px solid var(--icpw-border);
-  border-radius:var(--icpw-radius);
-  padding:14px;
-  background:#fff;
-  box-shadow:var(--icpw-shadow);
+/* タイトル */
+.icpw-card h3 {
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem 0;
+  color: #0f172a;
 }
 
-.icpw-title{
-  font-size:1.1rem;
-  margin:0 0 6px;
+/* メタ情報 */
+.icpw-meta {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 0.8rem;
 }
 
-.icpw-desc{
-  font-size:.9rem;
-  color:#444;
-  margin-bottom:8px;
+/* 本文 */
+.icpw-description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  color: #334155;
 }
 
-.icpw-badges{
-  margin:6px 0;
-  display:flex;
-  flex-wrap:wrap;
-  gap:4px;
+/* ボタン */
+.icpw-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.icpw-badge{
-  background:var(--icpw-accent);
-  color:var(--icpw-accent-contrast);
-  padding:2px 8px;
-  border-radius:calc(var(--icpw-radius) - 2px);
-  font-size:.78rem;
+.icpw-buttons a,
+.icpw-buttons button {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--icpw-radius, 6px);
+  background: #0f172a;
+  color: #fff;
+  text-decoration: none;
+  transition: background 0.2s ease, opacity 0.2s ease;
+  cursor: pointer;
+  border: none;
 }
 
-.icpw-meta{
-  font-size:.8rem;
-  color:#666;
-  margin-bottom:6px;
+.icpw-buttons a:hover,
+.icpw-buttons button:hover {
+  background: #1e293b;
+  opacity: 0.9;
 }
 
-.icpw-small{
-  margin:2px 0;
+/* コピー用ボタン */
+.icpw-copy-btn {
+  background: #475569;
 }
 
-.icpw-actions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
+.icpw-copy-btn:hover {
+  background: #334155;
 }
 
-.icpw-btn{
-  border:1px solid var(--icpw-border);
-  border-radius:calc(var(--icpw-radius) - 1px);
-  padding:6px 10px;
-  font-size:.85rem;
-  background:#fafafa;
-  cursor:pointer;
-}
-.icpw-btn:hover{
-  background:var(--icpw-accent);
-  color:var(--icpw-accent-contrast);
+/* レスポンシブ */
+@media (max-width: 768px) {
+  .icpw-card {
+    padding: 1rem;
+  }
 }
