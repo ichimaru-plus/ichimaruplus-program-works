@@ -2,15 +2,74 @@
   --icpw-accent:#6366f1;
   --icpw-accent-contrast:#fff;
   --icpw-border:#e5e7eb;
+  --icpw-radius:6px;
+  --icpw-shadow:0 2px 6px rgba(0,0,0,0.08);
 }
-.icpw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin:16px 0}
-.icpw-card{border:1px solid var(--icpw-border);border-radius:12px;padding:14px;background:#fff}
-.icpw-title{font-weight:700;margin:0 0 6px;font-size:1.05rem}
-.icpw-meta{font-size:.88rem;color:#374151;margin:.5em 0}
-.icpw-badges{display:flex;flex-wrap:wrap;gap:6px;margin:.5em 0}
-.icpw-badge{background:var(--icpw-accent);color:var(--icpw-accent-contrast);padding:2px 8px;border-radius:999px;font-size:.78rem}
-.icpw-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.icpw-btn{border:1px solid var(--icpw-border);border-radius:8px;padding:6px 10px;font-size:.85rem;background:#fafafa;cursor:pointer}
-.icpw-btn.copy{background:var(--icpw-accent);color:var(--icpw-accent-contrast);border-color:var(--icpw-accent)}
-.icpw-desc{color:#4b5563;font-size:.9rem;margin:.5em 0}
-.icpw-small{font-size:.8rem;color:#6b7280}
+
+.icpw-grid{
+  display:grid;
+  gap:16px;
+}
+
+.icpw-card{
+  border:1px solid var(--icpw-border);
+  border-radius:var(--icpw-radius);
+  padding:14px;
+  background:#fff;
+  box-shadow:var(--icpw-shadow);
+}
+
+.icpw-title{
+  font-size:1.1rem;
+  margin:0 0 6px;
+}
+
+.icpw-desc{
+  font-size:.9rem;
+  color:#444;
+  margin-bottom:8px;
+}
+
+.icpw-badges{
+  margin:6px 0;
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+}
+
+.icpw-badge{
+  background:var(--icpw-accent);
+  color:var(--icpw-accent-contrast);
+  padding:2px 8px;
+  border-radius:calc(var(--icpw-radius) - 2px);
+  font-size:.78rem;
+}
+
+.icpw-meta{
+  font-size:.8rem;
+  color:#666;
+  margin-bottom:6px;
+}
+
+.icpw-small{
+  margin:2px 0;
+}
+
+.icpw-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.icpw-btn{
+  border:1px solid var(--icpw-border);
+  border-radius:calc(var(--icpw-radius) - 1px);
+  padding:6px 10px;
+  font-size:.85rem;
+  background:#fafafa;
+  cursor:pointer;
+}
+.icpw-btn:hover{
+  background:var(--icpw-accent);
+  color:var(--icpw-accent-contrast);
+}

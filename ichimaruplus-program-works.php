@@ -3,7 +3,7 @@
  * Plugin Name: Ichimaru+ Program Works
  * Plugin URI:  https://github.com/ichimaru-plus/ichimaruplus-program-works
  * Description: プログラム作品（プラグイン/アプリ/ツール）を登録・公開。GitHub連携、CSV入出力、REST API、自動更新、ショートコード、色設定、コピー用ボタン対応。
- * Version:     1.1.0
+ * Version:     1.1.1
  * Author:      Ichimaru+
  * Author URI:  https://ichimaru.plus
  * Update URI:  ichimaruplus-program-works
@@ -68,3 +68,12 @@ add_filter('pre_set_site_transient_update_plugins', function($transient){
 
 // ショートコード登録
 add_action('init', ['ICPW_PW_Frontend','register_shortcode']);
+
+// icpw_prog（プログラム作品）の単一ページで、プラグイン内テンプレートに切り替え
+add_filter('template_include', function($template){
+  if (is_singular('icpw_prog')) {
+    $custom = ICPW_PW_PATH . 'templates/single-icpw_prog.php';
+    if (file_exists($custom)) return $custom;
+  }
+  return $template;
+});
