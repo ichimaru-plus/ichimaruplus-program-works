@@ -1,111 +1,152 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/**
+ * 管理画面（設定 → Program Works）
+ * - デザインプリセット（flat / wire / brand）
+ * - アクセント色（#hex）
+ * - アニメーション/影の無効化（完全フラット化）
+ */
 class ICPW_PW_Admin {
 
-  public static function init(){
-    add_action('admin_menu',[__CLASS__,'menu']);
-    add_action('admin_init',[__CLASS__,'register_settings']);
-  }
-
-  public static function menu(){
+  /** メニュー登録：設定配下に追加 */
+  public static function menu() {
     add_options_page(
       'Program Works 設定',
       'Program Works',
       'manage_options',
       'icpw_pw_settings',
-      [__CLASS__,'settings_page']
+      [__CLASS__, 'settings_page']
     );
   }
 
-  public static function register_settings(){
-    register_setting('icpw_pw_settings','icpw_pw_settings',[__CLASS__,'sanitize']);
+  /** 設定項目の登録 */
+  public static function register_settings() {
 
-    add_settings_section('icpw_pw_main','基本設定',null,'icpw_pw_settings');
+    /** -------------------------
+     * セクション：基本説明
+     * ------------------------ */
+    add_settings_section(
+      'icpw_section_general',
+      '基本設定',
+      function () {
+        echo '<p>プログラム作品（カスタム投稿 <code>icpw_prog</code>）の表示や見た目を調整します。<br>作品の単一ページでは、本文の直後に情報カードが自動で表示されます。</p>';
+      },
+      'icpw_pw_settings'
+    );
 
-    add_settings_field('accent_color','アクセントカラー',[__CLASS__,'field_color'],'icpw_pw_settings','icpw_pw_main');
-    add_settings_field('show_github','GitHub情報を表示',[__CLASS__,'field_showgithub'],'icpw_pw_settings','icpw_pw_main');
-    add_settings_field('enable_copy','コピー用ボタンを表示',[__CLASS__,'field_copy'],'icpw_pw_settings','icpw_pw_main');
+    /** -------------------------
+     * デザイン設定
+     * ------------------------ */
 
-    // 追加：デザイン設定
-    add_settings_field('border_radius','カードの角丸 (px)',[__CLASS__,'field_radius'],'icpw_pw_settings','icpw_pw_main');
-    add_settings_field('shadow_strength','影の濃さ',[__CLASS__,'field_shadow'],'icpw_pw_settings','icpw_pw_main');
+    // スタイルプリセット
+    register_setting('icpw_pw_settings', 'icpw_style', [
+      'type'              => 'string',
+      'default'           => 'flat',  // 初期値：Flat
+      'sanitize_callback' => 'sanitize_text_field',
+    ]);
+
+    // アクセント色
+    register_setting('icpw_pw_settings', 'icpw_accent', [
+      'type'              => 'string',
+      'default'           => '#1f2937',
+      'sanitize_callback' => 'sanitize_hex_color',
+    ]);
+
+    // 動き/影 無効化（完全フラット化）：true=無効化
+    register_setting('icpw_pw_settings', 'icpw_disable_motion', [
+      'type'              => 'boolean',
+      'default'           => true,   // 既定で「無効化（=フラット）」にする
+      'sanitize_callback' => function($v){ return (bool)$v; },
+    ]);
+
+    add_settings_section(
+      'icpw_section_style',
+      'デザイン',
+      function () {
+        echo '<p>カードの見た目を切替えます。<br>
+        ・<strong>Flat</strong>：標準 / <strong>Wire</strong>：線画・モノクロ / <strong>Brand</strong>：サイトカラー強調</p>';
+      },
+      'icpw_pw_settings'
+    );
+
+    // フィールド：スタイルプリセット
+    add_settings_field(
+      'icpw_style',
+      'スタイルプリセット',
+      function () {
+        $v = get_option('icpw_style', 'flat'); ?>
+        <select name="icpw_style">
+          <option value="flat"  <?php selected($v, 'flat');  ?>>Flat（標準）</option>
+          <option value="wire"  <?php selected($v, 'wire');  ?>>Wire（線画・モノクロ）</option>
+          <option value="brand" <?php selected($v, 'brand'); ?>>Brand（アクセント色）</option>
+        </select>
+        <?php
+      },
+      'icpw_pw_settings',
+      'icpw_section_style'
+    );
+
+    // フィールド：アクセント色
+    add_settings_field(
+      'icpw_accent',
+      'アクセント色',
+      function () {
+        $v = get_option('icpw_accent', '#1f2937');
+        echo '<input type="text" name="icpw_accent" value="' . esc_attr($v) . '" class="regular-text" placeholder="#1f2937">';
+        echo '<p class="description">Brand/Flat で使用する色（例: <code>#ff6600</code>）。</p>';
+      },
+      'icpw_pw_settings',
+      'icpw_section_style'
+    );
+
+    // フィールド：動き/影 無効化
+    add_settings_field(
+      'icpw_disable_motion',
+      'アニメーション・影を無効化（完全フラット）',
+      function () {
+        $checked = get_option('icpw_disable_motion', true); ?>
+        <label>
+          <input type="checkbox" name="icpw_disable_motion" value="1" <?php checked($checked, true); ?>>
+          有効（hover時のアニメーションや影を一切使わない）
+        </label>
+        <p class="description">チェックONで、カードとボタンの影・アニメーションを全て止めます。</p>
+        <?php
+      },
+      'icpw_pw_settings',
+      'icpw_section_style'
+    );
   }
 
-  public static function sanitize($in){
-    $out = [];
-    $out['accent_color'] = preg_match('/^#[0-9a-fA-F]{6}$/',$in['accent_color']??'') ? $in['accent_color'] : '#6366f1';
-    $out['show_github']  = empty($in['show_github']) ? 0 : 1;
-    $out['enable_copy']  = empty($in['enable_copy']) ? 0 : 1;
-
-    // 角丸
-    $radius = isset($in['border_radius']) ? intval($in['border_radius']) : 6;
-    if ($radius<0) $radius=0;
-    if ($radius>30) $radius=30;
-    $out['border_radius']=$radius;
-
-    // 影
-    $allowed=['none','soft','medium','strong'];
-    $shadow=$in['shadow_strength']??'soft';
-    $out['shadow_strength']=in_array($shadow,$allowed,true)?$shadow:'soft';
-
-    return $out;
-  }
-
-  public static function get_settings(){
-    $def=[
-      'accent_color'=>'#6366f1',
-      'show_github'=>1,
-      'enable_copy'=>1,
-      'border_radius'=>6,
-      'shadow_strength'=>'soft'
-    ];
-    return wp_parse_args(get_option('icpw_pw_settings',[]),$def);
-  }
-
-  public static function settings_page(){
-    ?>
+  /** 設定ページ本体 */
+  public static function settings_page() {
+    if (!current_user_can('manage_options')) return; ?>
     <div class="wrap">
-      <h1>Program Works 設定</h1>
+      <h1>Ichimaru+ Program Works 設定</h1>
+
       <form method="post" action="options.php">
         <?php
-        settings_fields('icpw_pw_settings');
-        do_settings_sections('icpw_pw_settings');
-        submit_button();
+          settings_fields('icpw_pw_settings');
+          do_settings_sections('icpw_pw_settings');
+          submit_button();
         ?>
       </form>
+
+      <hr>
+      <h2>使い方</h2>
+      <p>
+        管理画面の「<strong>Program Works</strong>」から作品を追加します。<br>
+        作品の単一ページでは、<strong>タイトル/本文はテーマのまま</strong>に表示され、<strong>本文の直後</strong>に本プラグインのカードが追加されます。
+      </p>
+      <ul>
+        <li><strong>スタイルプリセット</strong>：Flat / Wire / Brand を選択</li>
+        <li><strong>アクセント色</strong>：サイトの基調色を #hex で指定</li>
+        <li><strong>アニメーション・影を無効化</strong>：完全フラットにしたい場合はON</li>
+      </ul>
+      <p class="description">
+        表示が変わらない場合は、キャッシュプラグインのキャッシュ削除・ブラウザのハードリロード（⌘+Shift+R）をお試しください。
+      </p>
     </div>
     <?php
-  }
-
-  public static function field_color(){
-    $opt=self::get_settings();
-    echo '<input type="text" name="icpw_pw_settings[accent_color]" value="'.esc_attr($opt['accent_color']).'" class="regular-text" />';
-  }
-
-  public static function field_showgithub(){
-    $opt=self::get_settings();
-    echo '<input type="checkbox" name="icpw_pw_settings[show_github]" value="1" '.checked(1,$opt['show_github'],false).' />';
-  }
-
-  public static function field_copy(){
-    $opt=self::get_settings();
-    echo '<input type="checkbox" name="icpw_pw_settings[enable_copy]" value="1" '.checked(1,$opt['enable_copy'],false).' />';
-  }
-
-  public static function field_radius(){
-    $opt=self::get_settings();
-    echo '<input type="number" min="0" max="30" step="1" name="icpw_pw_settings[border_radius]" value="'.esc_attr($opt['border_radius']).'"> px';
-  }
-
-  public static function field_shadow(){
-    $opt=self::get_settings();
-    $val=$opt['shadow_strength'];
-    $opts=['none'=>'なし','soft'=>'やわらかめ','medium'=>'普通','strong'=>'強め'];
-    echo '<select name="icpw_pw_settings[shadow_strength]">';
-    foreach($opts as $k=>$label){
-      echo '<option value="'.$k.'" '.selected($val,$k,false).'>'.esc_html($label).'</option>';
-    }
-    echo '</select>';
   }
 }

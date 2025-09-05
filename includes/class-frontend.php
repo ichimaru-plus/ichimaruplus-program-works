@@ -1,125 +1,153 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Frontend 出力（本文直後のカード差し込み & ショートコード）
+ * - 単一ページ (icpw_prog) の本文直後にカードを自動追加
+ * - ショートコード [icpw_prog id="..."] / [icpw_prog slug="..."] も利用可
+ * - デザイン設定：スタイル(flat/wire/brand)・アクセント色・影/アニメ無効化
+ */
 class ICPW_PW_Frontend {
-  public static function register_shortcode(){
-    add_shortcode('icpw_works',[__CLASS__,'shortcode']);
+
+  /** 初期化（フィルタ/ショートコード登録） */
+  public static function register_shortcode() {
+    add_shortcode('icpw_prog', [__CLASS__, 'shortcode']);
+
+    // 本文直後にカードを1回だけ追加（重複防止）
+    if (!has_filter('the_content', [__CLASS__, 'append_card_after_content'])) {
+      add_filter('the_content', [__CLASS__, 'append_card_after_content'], 20);
+    }
   }
 
-  public static function shortcode($atts){
-    $a=shortcode_atts([
-      'ids'=>'',
-      'per_page'=>12,
-      'columns'=>3,
-      'github'=>'1',
-      'size'=>'md'
-    ],$atts,'icpw_works');
+  /** 本文直後にカードを追加（icpw_prog 単一ページのみ） */
+  public static function append_card_after_content($content) {
+    if (!is_singular('icpw_prog') || !in_the_loop() || !is_main_query()) {
+      return $content;
+    }
+    self::ensure_assets_and_inline_css();
 
+    $card = self::render_card(get_the_ID());
+    if (!$card) return $content;
+
+    return $content . "\n\n" . $card;
+  }
+
+  /** ショートコード: [icpw_prog id="123"] or [icpw_prog slug="foo"] */
+  public static function shortcode($atts = []) {
+    $atts = shortcode_atts(['id'=>0, 'slug'=>''], $atts, 'icpw_prog');
+
+    $post_id = 0;
+    if ($atts['id']) {
+      $post_id = (int) $atts['id'];
+    } elseif ($atts['slug']) {
+      $p = get_page_by_path(sanitize_title($atts['slug']), OBJECT, 'icpw_prog');
+      if ($p) $post_id = (int) $p->ID;
+    } else {
+      $post_id = get_the_ID();
+    }
+
+    if (!$post_id || get_post_type($post_id) !== 'icpw_prog') return '';
+
+    self::ensure_assets_and_inline_css();
+    return self::render_card($post_id);
+  }
+
+  /** 必要アセットの読み込みとインラインCSS注入（設定反映） */
+  private static function ensure_assets_and_inline_css() {
+    // 事前登録されている想定（プラグイン本体で wp_register_* 済）
     wp_enqueue_style('ichimaruplus-program-works');
     wp_enqueue_script('ichimaruplus-program-works');
 
-    $opt=class_exists('ICPW_PW_Admin')?ICPW_PW_Admin::get_settings():[
-      'accent_color'=>'#6366f1','show_github'=>1,'enable_copy'=>1,'border_radius'=>6,'shadow_strength'=>'soft'
-    ];
+    // 設定値の取得
+    $style   = get_option('icpw_style', 'flat');        // flat / wire / brand
+    $accent  = get_option('icpw_accent', '#1f2937');    // #hex
+    $noMove  = (bool) get_option('icpw_disable_motion', true); // 影・アニメ無効化
 
-    $accent=$opt['accent_color'];
-    $show_gh=($a['github']==='1')&&$opt['show_github'];
-    $enable_copy=$opt['enable_copy'];
-
-    $radius=intval($opt['border_radius']);
-    $shadow_key=$opt['shadow_strength'];
-    $shadow_map=[
-      'none'=>'none',
-      'soft'=>'0 2px 6px rgba(0,0,0,0.08)',
-      'medium'=>'0 3px 10px rgba(0,0,0,0.12)',
-      'strong'=>'0 4px 16px rgba(0,0,0,0.18)'
-    ];
-    $shadow_css=$shadow_map[$shadow_key]??$shadow_map['soft'];
-
-    $inline=':root{--icpw-accent:'.esc_attr($accent).';--icpw-radius:'.$radius.'px;--icpw-shadow:'.$shadow_css.';}';
-    wp_add_inline_style('ichimaruplus-program-works',$inline);
-
-    $args=['post_type'=>'icpw_prog','posts_per_page'=>intval($a['per_page'])];
-    if(!empty($a['ids'])){
-      $ids=array_filter(array_map('absint',explode(',',$a['ids'])));
-      if($ids){$args['post__in']=$ids;$args['orderby']='post__in';}
+    // アクセント色と動作無効CSSを注入
+    $css  = ':root{--icpw-accent:' . esc_attr($accent) . ';}' . "\n";
+    if ($noMove) {
+      $css .= <<<CSS
+.icpw-card{box-shadow:none !important;transition:none !important;}
+.icpw-card:hover{transform:none !important;}
+.icpw-btn,.icpw-btn--ghost,.icpw-copy-btn{box-shadow:none !important;transition:none !important;}
+.icpw-btn:hover,.icpw-btn--ghost:hover,.icpw-copy-btn:hover{transform:none !important;}
+CSS;
     }
-    $q=new WP_Query($args);
-    if(!$q->have_posts()){return '<p>作品がありません。</p>';}
+    // スタイルプリセットクラス（bodyではなくカードに付与するためCSSはここでは不要）
+    // 必要なら共通の微調整もここで追加可能
 
-    ob_start();
-    $classes=['icpw-grid'];
-    if($a['size']==='lg'){$classes[]='icpw-lg';}
-    if(intval($a['columns'])===1){$classes[]='icpw-single';}
-    $cols=max(1,intval($a['columns']));
-    $style='';
-    if(intval($a['columns'])>1){
-      $style='grid-template-columns:repeat('.$cols.',minmax(320px,1fr));';
+    wp_add_inline_style('ichimaruplus-program-works', $css);
+  }
+
+  /** カード描画（タイトル/本文はテーマに任せる） */
+  public static function render_card($post_id) {
+    // icpw_* / _icpw_* 両対応メタ取得ヘルパ
+    $getm = function($key) use ($post_id) {
+      $v = get_post_meta($post_id, $key, true);
+      if ($v !== '' && $v !== null) return $v;
+      return get_post_meta($post_id, '_' . $key, true);
+    };
+
+    // メタ情報
+    $repo_url    = $getm('icpw_repo_url');
+    $branch      = $getm('icpw_repo_branch') ?: $getm('icpw_default_branch');
+    $display_ver = $getm('icpw_display_version') ?: $getm('icpw_version');
+    $license     = $getm('icpw_license');
+    $site_url    = $getm('icpw_site_url');
+    $docs_url    = $getm('icpw_docs_url');
+
+    // GitHub 連携メタ（保存済み想定）
+    $stars  = (int) $getm('icpw_gh_stars');
+    $forks  = (int) $getm('icpw_gh_forks');
+    $issues = (int) $getm('icpw_gh_issues');
+    $lang   = (string) $getm('icpw_gh_language');
+
+    // 何も出す項目がないなら描画しない
+    if (!$repo_url && !$display_ver && !$license && !$branch && !$site_url && !$docs_url && !$stars && !$forks && !$issues && !$lang) {
+      return '';
     }
 
-    echo '<div class="'.esc_attr(implode(' ',$classes)).'" data-columns="'.esc_attr($cols).'" style="'.$style.'">';
-    foreach($q->posts as $p){
-      $meta=[];
-      foreach(ICPW_PW_Meta::schema() as $k=>$def){$meta[$k]=get_post_meta($p->ID,"_icpw_$k",true);}
-      $gh=false;
-      if($show_gh && !empty($meta['repo_url']) && ($meta['auto_fill']!=='0')){
-        $gh=ICPW_PW_GitHub::fetch($meta['repo_url']);
-        if($gh){$meta=ICPW_PW_GitHub::fill_meta($meta,$gh);}
-      }
-      $title=get_the_title($p);
-      $excerpt=wp_trim_words($p->post_excerpt?:wp_strip_all_tags($p->post_content),30);
-      $clone=!empty($meta['repo_url'])?'git clone '.esc_url_raw($meta['repo_url']):'';
-      $version=$meta['version']?:($gh['latest_release_tag']??$gh['latest_tag']??'');
-      $license=$meta['license']?:($gh['license']??'');
-      $branch=$meta['default_branch']?:($gh['default_branch']??'');
-      $lang=$gh['language']??'';
-      $stars=$gh['stars']??0;
-      $forks=$gh['forks']??0;
-      $issues=$gh['open_issues']??0;
-      $updated=!empty($gh['pushed_at'])?mysql2date(get_option('date_format'),$gh['pushed_at']):'';
-      $download_url='';
-      if($gh){
-        if(!empty($gh['download_zip'])){$download_url=$gh['download_zip'];}
-        elseif(!empty($gh['download_tag_zip'])){$download_url=$gh['download_tag_zip'];}
-        elseif(!empty($gh['download_branch_zip'])){$download_url=$gh['download_branch_zip'];}
-      }
-      ?>
-      <div class="icpw-card">
-        <h3 class="icpw-title"><a href="<?php echo esc_url(get_permalink($p)); ?>"><?php echo esc_html($title); ?></a></h3>
-        <div class="icpw-desc"><?php echo esc_html($excerpt); ?></div>
-        <?php if($show_gh && $gh): ?>
-          <div class="icpw-badges">
-            <span class="icpw-badge">⭐ <?php echo intval($stars); ?></span>
-            <span class="icpw-badge">🍴 <?php echo intval($forks); ?></span>
-            <span class="icpw-badge">🐞 <?php echo intval($issues); ?></span>
-            <?php if($lang): ?><span class="icpw-badge"><?php echo esc_html($lang); ?></span><?php endif; ?>
-            <?php if($version): ?><span class="icpw-badge"><?php echo esc_html($version); ?></span><?php endif; ?>
-          </div>
-          <div class="icpw-meta">
-            <div class="icpw-small">
-              <?php if($branch): ?>Branch: <?php echo esc_html($branch); ?><?php endif; ?>
-              <?php if($license): ?> / License: <?php echo esc_html($license); ?><?php endif; ?>
-              <?php if($updated): ?> / Updated: <?php echo esc_html($updated); ?><?php endif; ?>
-            </div>
-            <div class="icpw-small"><a href="<?php echo esc_url($gh['html_url']); ?>" target="_blank" rel="noopener">GitHub リポジトリ</a></div>
-          </div>
-        <?php endif; ?>
-        <div class="icpw-actions">
-          <?php if($enable_copy && $clone): ?>
-            <button type="button" class="icpw-btn copy" data-copy="<?php echo esc_attr($clone); ?>">コピー</button>
-          <?php endif; ?>
-          <?php if(!empty($meta['docs_url'])): ?>
-            <a class="icpw-btn" href="<?php echo esc_url($meta['docs_url']); ?>" target="_blank" rel="noopener">Docs</a>
-          <?php endif; ?>
-          <?php if($download_url): ?>
-            <a class="icpw-btn" href="<?php echo esc_url($download_url); ?>" target="_blank" rel="noopener">Download ZIP</a>
-          <?php endif; ?>
+    // スタイルプリセット（クラス付与）
+    $style = get_option('icpw_style', 'flat'); // flat / wire / brand
+    $style_class = 'icpw-style--' . sanitize_html_class($style);
+
+    ob_start(); ?>
+    <section class="icpw-wrap" aria-label="プログラム情報">
+      <div class="icpw-card <?php echo esc_attr($style_class); ?>">
+
+        <?php if ($stars || $forks || $issues || $lang): ?>
+        <div class="icpw-ghmeta" role="group" aria-label="リポジトリ統計">
+          <?php if ($stars):  ?><span class="icpw-ico">★ <?php echo number_format_i18n($stars); ?></span><?php endif; ?>
+          <?php if ($forks):  ?><span class="icpw-ico">⎇ <?php echo number_format_i18n($forks); ?></span><?php endif; ?>
+          <?php if ($issues): ?><span class="icpw-ico">⚠ <?php echo number_format_i18n($issues); ?></span><?php endif; ?>
+          <?php if ($lang):   ?><span class="icpw-ico">⌘ <?php echo esc_html($lang); ?></span><?php endif; ?>
         </div>
+        <?php endif; ?>
+
+        <dl class="icpw-info">
+          <?php if ($display_ver): ?><dt>バージョン</dt><dd><?php echo esc_html($display_ver); ?></dd><?php endif; ?>
+          <?php if ($license):     ?><dt>ライセンス</dt><dd><?php echo esc_html($license); ?></dd><?php endif; ?>
+          <?php if ($branch):      ?><dt>ブランチ</dt><dd><?php echo esc_html($branch); ?></dd><?php endif; ?>
+          <?php if ($repo_url):    ?><dt>リポジトリ</dt><dd><a href="<?php echo esc_url($repo_url); ?>" target="_blank" rel="noopener"><?php echo esc_html($repo_url); ?></a></dd><?php endif; ?>
+          <?php if ($site_url):    ?><dt>製品サイト</dt><dd><a href="<?php echo esc_url($site_url); ?>" target="_blank" rel="noopener"><?php echo esc_html($site_url); ?></a></dd><?php endif; ?>
+          <?php if ($docs_url):    ?><dt>ドキュメント</dt><dd><a href="<?php echo esc_url($docs_url); ?>" target="_blank" rel="noopener"><?php echo esc_html($docs_url); ?></a></dd><?php endif; ?>
+        </dl>
+
+        <?php if ($repo_url): ?>
+        <div class="icpw-buttons">
+          <a class="icpw-btn" href="<?php echo esc_url($repo_url); ?>" target="_blank" rel="noopener">GitHubで見る</a>
+          <div class="icpw-code">
+            <?php $cmd = 'git clone ' . $repo_url; ?>
+            <!-- ★ frontend.js と合わせて data-copy を使用（互換） -->
+            <button class="icpw-copy-btn" data-copy="<?php echo esc_attr($cmd); ?>">コピー</button>
+            <code><?php echo esc_html($cmd); ?></code>
+          </div>
+        </div>
+        <?php endif; ?>
+
       </div>
-      <?php
-    }
-    echo '</div>';
-    wp_reset_postdata();
+    </section>
+    <?php
     return ob_get_clean();
   }
 }

@@ -4,7 +4,7 @@ Tags: program, works, showcase, github, csv, rest-api, auto-update
 Requires at least: 6.0
 Tested up to: 6.8.2
 Requires PHP: 7.4
-Stable tag: 1.1.4
+Stable tag: 1.2.0
 License: GPL-2.0+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,13 @@ A. 設定画面からカードの角丸や影の濃さを調整可能です。
 3. 設定画面（デザインや色の調整）
 
 == Changelog ==
+
+= 1.2.0 =
+* CSS を刷新し、完全フラットデザインを基本に  
+* 設定ページに「アニメーション・影の無効化」オプションを追加（完全フラット化を簡単に切替）  
+* フロントエンドの CSS を整理し、Wire / Brand プリセットをよりシンプルに  
+* コピー用ボタンをアクセシビリティ対応（スクリーンリーダー通知を追加）  
+* 細かな UI/UX 改善（余白調整・ボタン配置の最適化）
 
 = 1.1.6 =
 * 更新できない不具合の改善

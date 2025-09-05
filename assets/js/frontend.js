@@ -1,49 +1,55 @@
-(function(){
-  function ready(fn){
-    if (document.readyState != 'loading'){
-      fn();
-    } else {
-      document.addEventListener('DOMContentLoaded', fn);
-    }
+(function () {
+  // DOM Ready helper
+  function ready(fn) {
+    if (document.readyState !== 'loading') { fn(); }
+    else { document.addEventListener('DOMContentLoaded', fn); }
   }
 
-  ready(function(){
-    document.body.addEventListener('click', function(e){
+  ready(function () {
+    // クリック委譲：data-copy を持つボタンでコピー
+    document.body.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-copy]');
-      if(!btn) return;
+      if (!btn) return;
 
       var text = btn.getAttribute('data-copy') || '';
-      if(!text) return;
+      if (!text) return;
 
-      function feedback(msg){
-        var old = btn.innerText;
-        btn.innerText = msg;
+      var done = function () {
         btn.dataset.copied = '1';
-        setTimeout(function(){
-          btn.innerText = old;
+        var original = btn.innerText;
+        btn.innerText = 'コピー済み';
+        // アクセシビリティ通知（スクリーンリーダー）
+        btn.setAttribute('aria-live', 'polite');
+        setTimeout(function () {
+          btn.innerText = original || 'コピー';
           btn.dataset.copied = '';
-        }, 1500);
-      }
+        }, 1200);
+      };
 
-      if (navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(text).then(function(){
-          feedback('コピーしました');
-        }).catch(function(){
-          feedback('コピー失敗');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () {
+          // フォールバック
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch (err) {}
+          document.body.removeChild(ta);
+          done();
         });
       } else {
-        // Fallback for old browsers
+        // 古い環境向けフォールバック
         var ta = document.createElement('textarea');
         ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
         document.body.appendChild(ta);
         ta.select();
-        try {
-          document.execCommand('copy');
-          feedback('コピーしました');
-        } catch(err){
-          feedback('コピー失敗');
-        }
+        try { document.execCommand('copy'); } catch (err) {}
         document.body.removeChild(ta);
+        done();
       }
     });
   });
